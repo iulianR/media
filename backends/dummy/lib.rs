@@ -168,6 +168,10 @@ impl Player for DummyPlayer {
     fn set_video_track(&self, _: i32, _: bool) -> Result<(), PlayerError> {
         Ok(())
     }
+    fn set_subtitle_track(&self, _: i32, _: bool) -> Result<(), PlayerError> {
+        Ok(())
+    }
+    fn set_subtitle_uri(&self, _: &str) -> Result<(), PlayerError> { Ok(()) }
 }
 
 impl WebRtcBackend for DummyBackend {

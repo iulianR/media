@@ -116,4 +116,6 @@ pub trait Player: Send + MediaInstance {
     fn render_use_gl(&self) -> bool;
     fn set_audio_track(&self, stream_index: i32, enabled: bool) -> Result<(), PlayerError>;
     fn set_video_track(&self, stream_index: i32, enabled: bool) -> Result<(), PlayerError>;
+    fn set_subtitle_track(&self, stream_index: i32, enabled: bool) -> Result<(), PlayerError>;
+    fn set_subtitle_uri(&self, uri: &str) -> Result<(), PlayerError>;
 }

@@ -9,7 +9,7 @@ use servo_media::{ClientContextId, ServoMedia};
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -109,6 +109,15 @@ fn run_example(servo_media: Arc<ServoMedia>) {
             }
         }
     });
+
+    let mut subtitle = PathBuf::new();
+    subtitle.push(&path);
+    subtitle.set_extension("vtt");
+
+    player.lock().unwrap().set_subtitle_track(0, true);
+    if subtitle.exists() {
+        player.lock().unwrap().set_subtitle_uri(&subtitle.to_str().unwrap());
+    }
 
     player.lock().unwrap().play().unwrap();
     seek_sender.send(0).unwrap();

@@ -67,6 +67,9 @@ fn metadata_from_media_info(media_info: &gst_player::PlayerMediaInfo) -> Result<
                     .to_string();
                 video_tracks.push(codec);
             }
+            "text" => {
+                println!("Got text type");
+            }
             _ => {}
         }
     }
@@ -311,6 +314,20 @@ impl PlayerInner {
         self.player.set_video_track_enabled(enabled);
         Ok(())
     }
+
+    fn set_subtitle_track(&mut self, stream_index: i32, enabled: bool) -> Result<(), PlayerError> {
+        self.player
+            .set_subtitle_track(stream_index)
+            .map_err(|_| PlayerError::SetTrackFailed)?;
+        self.player.set_subtitle_track_enabled(enabled);
+        Ok(())
+    }
+
+    fn set_subtitle_uri(&mut self, uri: &str) -> Result<(), PlayerError> {
+        self.player.set_subtitle_uri(&uri);
+        self.player.set_subtitle_track_enabled(true);
+        Ok(())
+    }
 }
 
 macro_rules! notify(
@@ -510,6 +527,30 @@ impl GStreamerPlayer {
             );
         }
 
+        let text_sink = gst::ElementFactory::make("appsink", None)
+            .map_err(|_| PlayerError::Backend("appsink creation failed".to_owned()))?;
+        pipeline
+            .set_property("text-sink", &text_sink)
+            .expect("playbin doesn't have expected 'text-sink' property");
+
+        let text_sink = text_sink.dynamic_cast::<gst_app::AppSink>().unwrap();
+        text_sink.set_caps(Some(&gst::Caps::new_simple(
+            "text/vtt",
+            &[],
+        )));
+        text_sink.set_callbacks(
+            gst_app::AppSinkCallbacks::new()
+                .new_preroll(|_| {
+                    println!("preroll");
+                    Ok(gst::FlowSuccess::Ok)
+                })
+                .new_sample(move |text_sink| {
+                    println!("got sample");
+                    Ok(gst::FlowSuccess::Ok)
+                })
+                .build(),
+        );
+
         let video_sink = self.render.lock().unwrap().setup_video_sink(&pipeline)?;
 
         // There's a known bug in gstreamer that may cause a wrong transition
@@ -687,6 +728,7 @@ impl GStreamerPlayer {
             let is_ready_clone = self.is_ready.clone();
             let observer = self.observer.clone();
             let connect_result = pipeline.connect("source-setup", false, move |args| {
+                dbg!("Ready");
                 let source = match args[1].get::<gst::Element>() {
                     Ok(Some(source)) => source,
                     _ => {
@@ -838,6 +880,7 @@ impl Player for GStreamerPlayer {
     inner_player_proxy!(seek, time, f64);
     inner_player_proxy!(set_volume, value, f64);
     inner_player_proxy!(buffered, Vec<Range<f64>>);
+    inner_player_proxy!(set_subtitle_uri, uri, &str);
 
     fn render_use_gl(&self) -> bool {
         self.render.lock().unwrap().is_gl()
@@ -862,6 +905,13 @@ impl Player for GStreamerPlayer {
         let inner = self.inner.borrow();
         let mut inner = inner.as_ref().unwrap().lock().unwrap();
         inner.set_video_track(stream_index, enabled)
+    }
+
+    fn set_subtitle_track(&self, stream_index: i32, enabled: bool) -> Result<(), PlayerError> {
+        self.setup()?;
+        let inner = self.inner.borrow();
+        let mut inner = inner.as_ref().unwrap().lock().unwrap();
+        inner.set_subtitle_track(stream_index, enabled)
     }
 }
 
